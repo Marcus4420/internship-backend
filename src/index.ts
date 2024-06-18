@@ -14,6 +14,7 @@ interface Job {
   link: string | undefined;
   company: string | undefined;
   image_url: string;
+  location: string[];
   scraped_from?: string;
 }
 
@@ -36,6 +37,8 @@ const scrapeIdaJobbank = async (): Promise<Job[]> => {
     const linkElement = jobElement.find('.node-list__item-title--link').first();
     const companyElement = jobElement.find('.node-list__item-recruiter').first();
     const imageElement = jobElement.find('.node-list__item-logo').find('img').first();
+    const locationElement = jobElement.find('.node-list__item-location').first();
+    const location = locationElement.text().replace('location_on', '');
     
 
     let title = titleElement.text();
@@ -46,16 +49,21 @@ const scrapeIdaJobbank = async (): Promise<Job[]> => {
     let image = imageElement.attr('src');
   
 
-
+    if (!image) {
+      image = 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f0/Error.svg/1200px-Error.svg.png';
+    }
 
     if (link && !link.startsWith('http')) {
       link = `https://www.jobfinder.dk${link}`;
     }
 
+    let locations: string[] = [];
+    locations.push(location);
+
     title = title.replace(/\t/g, '').trim();
     teaser = teaser.replace(/\t/g, '').trim();
 
-    const job: Job = { title, teaser, link, scraped_from: 'Ida job bank', company, image_url: image};
+    const job: Job = { title, teaser, link, scraped_from: 'Ida job bank', company, image_url: image, location: locations};
     jobs.push(job);
   });
 
@@ -86,9 +94,6 @@ const scrapeStudereneOnline = async (): Promise<Job[]> => {
     let image = companyElement.attr('data-original');
     let company = companyElement.attr('alt')?.replace(" - logo", "").trim();;
 
-
-    console.log(image);
-
     if (link && !link.startsWith('http')) {
       link = `https://studerendeonline.dk${link}`;
     }
@@ -97,10 +102,34 @@ const scrapeStudereneOnline = async (): Promise<Job[]> => {
       image = `https://studerendeonline.dk${image}`;
     }
 
-    title = title.replace(/\t/g, '').trim();
-    teaser = teaser.replace(/\t/g, '').trim();
+    if (!image) {
+      image = 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f0/Error.svg/1200px-Error.svg.png';
+    }
 
-    const job: Job = { title, teaser, released, deadline, link, scraped_from: 'Studerende Online', company, image_url: image};
+    title = title.replace(/\t/g, '').trim();
+    teaser = "Studiejob hos " + company;
+    console.log(teaser);
+
+    let locations: string[] = [];
+
+    const teaserSplitToWords = teaser.split(' ');
+    if (company) {
+      const companySplitToWords = company.split(' ');
+      //console.log("Last word in company name: ",companySplitToWords[companySplitToWords.length - 1])
+      const indexOfCompanyName = teaserSplitToWords.indexOf(companySplitToWords[companySplitToWords.length - 1] + ',')
+      locations = teaserSplitToWords.slice(indexOfCompanyName + 1, teaserSplitToWords.length + 1);
+      //console.log(indexOfCompanyName);
+      //console.log(teaserSplitToWords[indexOfCompanyName]);
+    }
+
+
+    /*
+    const locationBeginning = teaser.indexOf(',');
+    const teaserToArray = teaser.split('');
+    console.log(teaserToArray);
+    */
+
+    const job: Job = { title, teaser, released, deadline, link, scraped_from: 'Studerende Online', company, image_url: image, location: locations};
     jobs.push(job);
   });
 
