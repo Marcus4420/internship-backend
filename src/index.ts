@@ -14,7 +14,7 @@ interface Job {
   link: string | undefined;
   company: string | undefined;
   image_url: string;
-  location: string[];
+  locations: string[];
   scraped_from?: string;
 }
 
@@ -26,7 +26,8 @@ const cache = {
 };
 
 const scrapeIdaJobbank = async (): Promise<Job[]> => {
-  const response = await axios.get('https://www.jobfinder.dk/jobs/category/it/category/softwareudvikling/jobtype/praktikplads/jobtype/studiejob?radius=-&latlon=Fyn%2C%20Danmark');
+  //TODO: Udvid til at scrape flere pages fra Ida
+  const response = await axios.get('https://www.jobfinder.dk/jobs/jobtype/praktikplads/jobtype/studiejob/category/it/category/softwareudvikling');
   const selector = cheerio.load(response.data);
 
   const jobs: Job[] = [];
@@ -58,12 +59,14 @@ const scrapeIdaJobbank = async (): Promise<Job[]> => {
     }
 
     let locations: string[] = [];
-    locations.push(location);
+    location.split('/').forEach(loc => {
+      locations.push(loc.trim());
+    });
 
     title = title.replace(/\t/g, '').trim();
     teaser = teaser.replace(/\t/g, '').trim();
 
-    const job: Job = { title, teaser, link, scraped_from: 'Ida job bank', company, image_url: image, location: locations};
+    const job: Job = { title, teaser, link, scraped_from: 'Ida job bank', company, image_url: image, locations: locations};
     jobs.push(job);
   });
 
@@ -71,7 +74,7 @@ const scrapeIdaJobbank = async (): Promise<Job[]> => {
 }
 
 const scrapeStudereneOnline = async (): Promise<Job[]> => {
-  const response = await axios.get('https://studerendeonline.dk/studiejob/it/fyn/');
+  const response = await axios.get('https://studerendeonline.dk/job/?cvtype=4&max=100&branche=10331');
   const selector = cheerio.load(response.data);
 
   const jobs: Job[] = [];
@@ -107,30 +110,20 @@ const scrapeStudereneOnline = async (): Promise<Job[]> => {
     }
 
     title = title.replace(/\t/g, '').trim();
-    teaser = "Studiejob hos " + company;
-    console.log(teaser);
+    teaser = teaser.replace(/\t/g, '').trim();
 
     let locations: string[] = [];
 
     const teaserSplitToWords = teaser.split(' ');
     if (company) {
       const companySplitToWords = company.split(' ');
-      //console.log("Last word in company name: ",companySplitToWords[companySplitToWords.length - 1])
       const indexOfCompanyName = teaserSplitToWords.indexOf(companySplitToWords[companySplitToWords.length - 1] + ',')
       locations = teaserSplitToWords.slice(indexOfCompanyName + 1, teaserSplitToWords.length + 1);
-      //console.log(indexOfCompanyName);
-      //console.log(teaserSplitToWords[indexOfCompanyName]);
+      locations = locations.map(loc => loc.replace(',', '').trim());
     }
-
-
-    /*
-    const locationBeginning = teaser.indexOf(',');
-    const teaserToArray = teaser.split('');
-    console.log(teaserToArray);
-    */
-
-    const job: Job = { title, teaser, released, deadline, link, scraped_from: 'Studerende Online', company, image_url: image, location: locations};
+    const job: Job = { title, teaser: "Studiejob hos " + company, released, deadline, link, scraped_from: 'Studerende Online', company, image_url: image, locations: locations};
     jobs.push(job);
+
   });
 
   return jobs;
@@ -146,6 +139,8 @@ app.get('/', async (c) => {
     // else we fetch a new one
     const studerendeonline = await scrapeStudereneOnline();
     const idajobbank = await scrapeIdaJobbank();
+    console.log("Studerende længde", studerendeonline.length);
+    console.log("Ida jobbank længde", idajobbank.length);
     let jobtitles = [...studerendeonline, ...idajobbank];
 
     // Parse dates and sort jobs by release date, placing those without a release date at the bottom
